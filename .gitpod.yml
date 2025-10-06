@@ -1,39 +1,47 @@
 image:
-  # Use Espressif's official IDF Docker image (includes toolchain, Python deps, etc.)
   pull: espressif/idf:release-v5.3
 
-# Set environment variables for ESP-IDF
 env:
-  IDF_PATH: /opt/esp/idf  # Default path in the Docker image
-  IDF_TOOLS_PATH: /opt/.espressif  # Default tools path
+  IDF_PATH: /opt/esp/idf
+  IDF_TOOLS_PATH: /opt/.espressif
 
-# Tasks to run on workspace start
 tasks:
   - init: |
-      # Source ESP-IDF environment (adds tools to PATH)
       . $IDF_PATH/export.sh
       echo "ESP-IDF environment sourced. Version: $(idf.py --version)"
     command: |
-      # Create a new IDF project if it doesn't exist
-      if [ ! -d "my_ulpc_project" ]; then
-        idf.py create-project my_ulpc_project
-        cd my_ulpc_project
-        # Enable ULP in default config (for ESP32-S3; adjust for your chip)
+      if [ ! -d "my_ulp_project" ]; then
+        idf.py create-project my_ulp_project
+        cd my_ulp_project
+        # Enable ULP for ESP32 (8-bit coprocessor)
         echo "CONFIG_ULP_COPROC_ENABLED=y" >> sdkconfig.defaults
-        echo "CONFIG_ULP_COPROC_TYPE_RISCV=y" >> sdkconfig.defaults
-        echo "CONFIG_ULP_COPROC_RESERVE_MEM=4096" >> sdkconfig.defaults
-        # Set target chip (change to esp32 if needed)
-        idf.py set-target esp32s3
+        # No RISC-V settings; ESP32 uses 8-bit ULP
+        idf.py set-target esp32
+        # Create a sample ULP assembly file
+        mkdir -p components/ulp
+        if [ ! -f "components/ulp/ulp_main.S" ]; then
+          echo '#include "soc/rtc_cntl_reg.h"' > components/ulp/ulp_main.S
+          echo '  .global entry' >> components/ulp/ulp_main.S
+          echo 'entry:' >> components/ulp/ulp_main.S
+          echo '  move r3, r0' >> components/ulp/ulp_main.S  # Example: Clear r3
+          echo '  halt' >> components/ulp/ulp_main.S
+        fi
+        # Update CMakeLists.txt to include ULP component
+        echo 'set(ULP_APP_NAME ulp_${PROJECT_NAME})' >> CMakeLists.txt
+        echo 'set(ULP_S_SOURCES "components/ulp/ulp_main.S")' >> CMakeLists.txt
+        echo 'set(ULP_EXP_DEP_NAMES "ulp")' >> CMakeLists.txt
+        echo 'include($ENV{IDF_PATH}/tools/cmake/ulp.cmake)' >> CMakeLists.txt
+        echo 'ulp_embed_binary(${ULP_APP_NAME} "${ULP_S_SOURCES}" "${ULP_EXP_DEP_NAMES}")' >> CMakeLists.txt
       else
-        cd my_ulpc_project
+        cd my_ulp_project
       fi
-      # Open the project in VS Code
+      # Build the project to verify ULP compilation
+      idf.py build
       code .
     env:
-      IDF_TARGET: esp32s3  # Default target; change via idf.py set-target
+      IDF_TARGET: esp32
 
-# VS Code extensions for ESP-IDF development
 vscode:
   extensions:
-    - esphome.espressif-iot  # Official ESP-IDF extension (syntax, build integration)
-    - ms-vscode.cpptools  # C/C++ support
+    - espressif.espressif-idf
+    - ms-vscode.cpptools
