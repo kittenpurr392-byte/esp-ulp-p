@@ -1,0 +1,39 @@
+image:
+  # Use Espressif's official IDF Docker image (includes toolchain, Python deps, etc.)
+  pull: espressif/idf:release-v5.3
+
+# Set environment variables for ESP-IDF
+env:
+  IDF_PATH: /opt/esp/idf  # Default path in the Docker image
+  IDF_TOOLS_PATH: /opt/.espressif  # Default tools path
+
+# Tasks to run on workspace start
+tasks:
+  - init: |
+      # Source ESP-IDF environment (adds tools to PATH)
+      . $IDF_PATH/export.sh
+      echo "ESP-IDF environment sourced. Version: $(idf.py --version)"
+    command: |
+      # Create a new IDF project if it doesn't exist
+      if [ ! -d "my_ulpc_project" ]; then
+        idf.py create-project my_ulpc_project
+        cd my_ulpc_project
+        # Enable ULP in default config (for ESP32-S3; adjust for your chip)
+        echo "CONFIG_ULP_COPROC_ENABLED=y" >> sdkconfig.defaults
+        echo "CONFIG_ULP_COPROC_TYPE_RISCV=y" >> sdkconfig.defaults
+        echo "CONFIG_ULP_COPROC_RESERVE_MEM=4096" >> sdkconfig.defaults
+        # Set target chip (change to esp32 if needed)
+        idf.py set-target esp32s3
+      else
+        cd my_ulpc_project
+      fi
+      # Open the project in VS Code
+      code .
+    env:
+      IDF_TARGET: esp32s3  # Default target; change via idf.py set-target
+
+# VS Code extensions for ESP-IDF development
+vscode:
+  extensions:
+    - esphome.espressif-iot  # Official ESP-IDF extension (syntax, build integration)
+    - ms-vscode.cpptools  # C/C++ support
