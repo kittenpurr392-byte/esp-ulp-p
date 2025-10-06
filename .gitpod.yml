@@ -1,47 +1,6 @@
 image:
   pull: espressif/idf:release-v5.3
 
-env:
-  IDF_PATH: /opt/esp/idf
-  IDF_TOOLS_PATH: /opt/.espressif
-
 tasks:
-  - init: |
-      . $IDF_PATH/export.sh
-      echo "ESP-IDF environment sourced. Version: $(idf.py --version)"
-    command: |
-      if [ ! -d "my_ulp_project" ]; then
-        idf.py create-project my_ulp_project
-        cd my_ulp_project
-        # Enable ULP for ESP32 (8-bit coprocessor)
-        echo "CONFIG_ULP_COPROC_ENABLED=y" >> sdkconfig.defaults
-        # No RISC-V settings; ESP32 uses 8-bit ULP
-        idf.py set-target esp32
-        # Create a sample ULP assembly file
-        mkdir -p components/ulp
-        if [ ! -f "components/ulp/ulp_main.S" ]; then
-          echo '#include "soc/rtc_cntl_reg.h"' > components/ulp/ulp_main.S
-          echo '  .global entry' >> components/ulp/ulp_main.S
-          echo 'entry:' >> components/ulp/ulp_main.S
-          echo '  move r3, r0' >> components/ulp/ulp_main.S  # Example: Clear r3
-          echo '  halt' >> components/ulp/ulp_main.S
-        fi
-        # Update CMakeLists.txt to include ULP component
-        echo 'set(ULP_APP_NAME ulp_${PROJECT_NAME})' >> CMakeLists.txt
-        echo 'set(ULP_S_SOURCES "components/ulp/ulp_main.S")' >> CMakeLists.txt
-        echo 'set(ULP_EXP_DEP_NAMES "ulp")' >> CMakeLists.txt
-        echo 'include($ENV{IDF_PATH}/tools/cmake/ulp.cmake)' >> CMakeLists.txt
-        echo 'ulp_embed_binary(${ULP_APP_NAME} "${ULP_S_SOURCES}" "${ULP_EXP_DEP_NAMES}")' >> CMakeLists.txt
-      else
-        cd my_ulp_project
-      fi
-      # Build the project to verify ULP compilation
-      idf.py build
-      code .
-    env:
-      IDF_TARGET: esp32
-
-vscode:
-  extensions:
-    - espressif.espressif-idf
-    - ms-vscode.cpptools
+  - init: echo "Initializing ESP32 ULP project"
+    command: idf.py build
